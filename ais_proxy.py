@@ -111,7 +111,6 @@ def run_ais():
 app = Flask(__name__)
 CORS(app)
 
-# Embedded HTML (self-contained)
 HTML = """<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -121,14 +120,9 @@ HTML = """<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Heebo:wght@300;400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg-deep:#f4f7fb; --bg-panel:#ffffff; --bg-panel-raised:#f0f4f8;
-    --line:#d0d7e2; --line-soft:#e2e8f0; --text-hi:#1a2332;
-    --text-mid:#4a5568; --text-low:#718096; --teal:#0d9488;
-    --teal-dim:#0f766e; --amber:#d97706; --red:#dc2626; --blue:#2563eb; --radius:10px;
-  }
+  :root{--bg-deep:#f4f7fb;--bg-panel:#ffffff;--bg-panel-raised:#f0f4f8;--line:#d0d7e2;--line-soft:#e2e8f0;--text-hi:#1a2332;--text-mid:#4a5568;--text-low:#718096;--teal:#0d9488;--teal-dim:#0f766e;--amber:#d97706;--red:#dc2626;--blue:#2563eb;--radius:10px;}
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:#f4f7fb url('https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1920&q=80') center/cover fixed; color:var(--text-hi); font-family:'Heebo',sans-serif; min-height:100vh; padding:28px 32px 40px;}
+  body{background:#f4f7fb url('https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1920&q=80') center/cover fixed;color:var(--text-hi);font-family:'Heebo',sans-serif;min-height:100vh;padding:28px 32px 40px;}
   body::before{content:'';position:fixed;inset:0;background:rgba(255,255,255,0.90);z-index:-1;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:20px;flex-wrap:wrap;gap:16px;}
   .brand{display:flex;align-items:center;gap:14px;}
@@ -136,21 +130,21 @@ HTML = """<!DOCTYPE html>
   .brand-text .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--teal);text-transform:uppercase;}
   .brand-text h1{font-family:'Rubik',sans-serif;font-weight:700;font-size:24px;margin-top:2px;}
   .topbar-right{display:flex;gap:28px;align-items:flex-end;}
-  .stat-mini{text-align:center;} .stat-mini .n{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;}
+  .stat-mini{text-align:center;}.stat-mini .n{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;}
   .stat-mini .l{font-size:11px;color:var(--text-low);margin-top:6px;}
   .clock-block .time{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;}
   .clock-block .date{font-size:12px;color:var(--text-mid);margin-top:6px;}
   .tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--line);}
   .tab{padding:10px 20px;background:transparent;border:none;color:var(--text-mid);font-family:'Heebo',sans-serif;font-weight:500;font-size:15px;cursor:pointer;border-bottom:3px solid transparent;}
   .tab.active{color:var(--teal);border-bottom-color:var(--teal);}
-  .panel{display:none;} .panel.active{display:block;}
+  .panel{display:none;}.panel.active{display:block;}
   .board{display:flex;flex-direction:column;gap:12px;}
   .row{background:var(--bg-panel);border:1px solid var(--line-soft);border-radius:var(--radius);display:grid;grid-template-columns:5px 1.8fr 1.1fr 0.9fr 0.9fr 0.9fr 1.3fr auto;align-items:stretch;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
-  .row .accent{width:5px;} .row.status-ok .accent{background:var(--teal);} .row.status-warn .accent{background:var(--amber);} .row.status-alert .accent{background:var(--red);} .row.status-done .accent{background:var(--blue);}
+  .row .accent{width:5px;}.row.status-ok .accent{background:var(--teal);}.row.status-warn .accent{background:var(--amber);}.row.status-alert .accent{background:var(--red);}.row.status-done .accent{background:var(--blue);}
   .cell{padding:16px 14px;display:flex;flex-direction:column;justify-content:center;border-inline-start:1px solid var(--line-soft);}
   .row .accent + .cell{border-inline-start:none;}
   .label{font-size:11px;color:var(--text-low);letter-spacing:.05em;margin-bottom:6px;}
-  input.num-input, select.status-select{background:var(--bg-panel-raised);border:1px solid var(--line);border-radius:6px;color:var(--text-hi);font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;padding:6px 8px;width:100%;max-width:120px;text-align:center;}
+  input.num-input, select.status-select, input{background:var(--bg-panel-raised);border:1px solid var(--line);border-radius:6px;color:var(--text-hi);font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;padding:6px 8px;width:100%;max-width:120px;text-align:center;}
   select.status-select{font-family:'Heebo',sans-serif;font-size:13px;max-width:100%;text-align:right;}
   .more-cell{align-items:center;justify-content:center;gap:6px;}
   .icon-btn{width:34px;height:34px;border-radius:8px;background:var(--bg-panel-raised);border:1px solid var(--line);color:var(--text-mid);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -176,9 +170,26 @@ HTML = """<!DOCTYPE html>
 <div id="panel-forecast" class="panel">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
     <h2 style="font-size:16px;color:var(--text-mid);">צפי הגעות</h2>
-    <button class="add-btn" onclick="loadForecast()">רענן צפי</button>
+    <div style="display:flex;gap:8px;">
+      <button class="add-btn" onclick="loadForecast()">רענן צפי</button>
+      <button class="add-btn" style="background:#4a5568;" onclick="showManualForm()">הוסף אוניה ידנית</button>
+    </div>
   </div>
-  <p id="forecast-status" style="font-size:13px;color:var(--text-mid);margin-bottom:12px;">לחץ "רענן צפי"</p>
+  <p id="forecast-status" style="font-size:13px;color:var(--text-mid);margin-bottom:12px;">לחץ "רענן צפי" או הוסף ידנית</p>
+  <div id="manual-form" style="display:none;background:var(--bg-panel);border:1px solid var(--line-soft);border-radius:8px;padding:16px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div><label class="label">שם אוניה</label><input id="m-name" style="width:100%;max-width:none;"></div>
+      <div><label class="label">ETA</label><input id="m-eta" placeholder="למשל 22.10 · 14:30" style="width:100%;max-width:none;"></div>
+      <div><label class="label">מקור / יעד</label><input id="m-origin" style="width:100%;max-width:none;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div><label class="label">רציף</label><input id="m-berth" style="width:100%;max-width:none;"></div>
+      <div><label class="label">דגל / מדינה</label><input id="m-flag" style="width:100%;max-width:none;"></div>
+      <div><label class="label">IMO</label><input id="m-imo" style="width:100%;max-width:none;"></div>
+    </div>
+    <button class="add-btn" onclick="addManualShip()">הוסף למסך</button>
+    <button class="add-btn" style="background:#718096;margin-inline-start:8px;" onclick="hideManualForm()">ביטול</button>
+  </div>
   <div id="forecast-headers" style="display:none;grid-template-columns:2fr 1.2fr 1fr 1fr auto;gap:10px;padding:8px 12px;font-size:11px;color:var(--text-low);font-weight:600;border-bottom:1px solid var(--line);">
     <div>שם אוניה / MMSI</div><div>ETA משוער</div><div>יעד / מקור</div><div>רציף</div><div></div>
   </div>
@@ -222,6 +233,16 @@ function renderMain(){
 function updateField(id,field,value){const s=mainShips.find(x=>x.id===id);if(s){if(['crew','pax','treat'].includes(field))value=value===''?null:Number(value);s[field]=value;save();updateStats();}}
 function updateStatus(id,status){const s=mainShips.find(x=>x.id===id);if(!s)return;if(status==='done'){archive.push({...s,archivedAt:new Date().toISOString()});mainShips=mainShips.filter(x=>x.id!==id);}else s.status=status;save();renderMain();updateStats();}
 function removeFromMain(id){if(!confirm('להסיר?'))return;mainShips=mainShips.filter(s=>s.id!==id);save();renderMain();updateStats();}
+function showManualForm(){document.getElementById('manual-form').style.display='block';}
+function hideManualForm(){document.getElementById('manual-form').style.display='none';}
+function addManualShip(){
+  const name=document.getElementById('m-name').value.trim();
+  if(!name){alert('יש להזין שם אוניה');return;}
+  const ship={id:Date.now(),sourceId:'manual_'+Date.now(),name:name,flag:document.getElementById('m-flag').value.trim(),imo:document.getElementById('m-imo').value.trim(),origin:document.getElementById('m-origin').value.trim()||'—',eta:document.getElementById('m-eta').value.trim()||'—',berth:document.getElementById('m-berth').value.trim(),crew:null,pax:null,treat:null,status:'ok'};
+  mainShips.push(ship);save();renderMain();updateStats();hideManualForm();
+  ['m-name','m-eta','m-origin','m-berth','m-flag','m-imo'].forEach(id=>document.getElementById(id).value='');
+  switchTab('main');
+}
 async function loadForecast(){
   const status=document.getElementById('forecast-status'), list=document.getElementById('forecast-list'), headers=document.getElementById('forecast-headers');
   status.textContent='טוען...'; list.innerHTML=''; headers.style.display='none';
