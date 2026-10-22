@@ -8,7 +8,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from threading import Thread
 import websockets
@@ -19,6 +19,31 @@ if not API_KEY:
 
 vessels = {}
 last_update = 0
+
+# Server-side persistent storage (simple in-memory + optional file)
+import threading
+lock = threading.Lock()
+main_ships = []
+archive_ships = []
+
+def load_storage():
+    global main_ships, archive_ships
+    try:
+        if os.path.exists("ships.json"):
+            with open("ships.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+                main_ships = data.get("main", [])
+                archive_ships = data.get("archive", [])
+    except:
+        pass
+
+def save_storage():
+    with lock:
+        with open("ships.json", "w", encoding="utf-8") as f:
+            json.dump({"main": main_ships, "archive": archive_ships}, f, ensure_ascii=False)
+
+load_storage()
+
 
 def is_relevant(msg):
     meta = msg.get("MetaData", {})
@@ -197,11 +222,15 @@ HTML = """<!DOCTYPE html>
 </div>
 <div id="panel-archive" class="panel"><h2 style="font-size:16px;color:var(--text-mid);margin-bottom:16px;">ארכיון</h2><div id="archive-list"></div></div>
 <script>
-let mainShips=JSON.parse(localStorage.getItem('ashdod_main')||'[]');
-let archive=JSON.parse(localStorage.getItem('ashdod_archive')||'[]');
+let mainShips=[];
+let archive=[];
 let forecastShips=[];
 function esc(s){return String(s||'').replace(/&/g,'&').replace(/</g,'<').replace(/"/g,'"');}
-function save(){localStorage.setItem('ashdod_main',JSON.stringify(mainShips));localStorage.setItem('ashdod_archive',JSON.stringify(archive));}
+async function save(){
+  try{
+    await fetch('/ships',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({main:mainShips,archive:archive})});
+  }catch(e){console.error('Save failed',e);}
+}
 function updateStats(){document.getElementById('stat-ships').textContent=mainShips.length;document.getElementById('stat-pax').textContent=mainShips.reduce((a,s)=>a+(Number(s.pax)||0),0);}
 function renderMain(){
   const board=document.getElementById('board'), empty=document.getElementById('empty-main');
@@ -273,7 +302,18 @@ function addToMain(fid){const f=forecastShips.find(x=>x.id===fid);if(!f||mainShi
 function renderArchive(){const el=document.getElementById('archive-list');if(!el)return;if(!archive.length){el.innerHTML='<p style="color:var(--text-mid);text-align:center;padding:30px;">הארכיון ריק</p>';return;}el.innerHTML=archive.slice().reverse().map(s=>`<div style="background:var(--bg-panel);border:1px solid var(--line-soft);border-radius:8px;padding:14px;margin-bottom:8px;"><strong>${esc(s.name)}</strong> · ${esc(s.eta||'')} · צוות ${s.crew??'—'} · נוסעים ${s.pax??'—'} · דורשי טיפול ${s.treat??'—'}<div style="font-size:12px;color:var(--text-low);margin-top:4px;">נשמר: ${new Date(s.archivedAt).toLocaleString('he-IL')}</div></div>`).join('');}
 function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');document.getElementById('panel-'+name).classList.add('active');if(name==='archive')renderArchive();if(name==='main')renderMain();}
 function tick(){const now=new Date();document.getElementById('clock').textContent=now.toLocaleTimeString('he-IL');document.getElementById('date').textContent=now.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});}
-setInterval(tick,1000);tick();renderMain();updateStats();
+async function loadFromServer(){
+  try{
+    const res=await fetch('/ships');
+    if(res.ok){
+      const data=await res.json();
+      mainShips=data.main||[];
+      archive=data.archive||[];
+    }
+  }catch(e){console.error('Load failed',e);}
+  renderMain();updateStats();
+}
+setInterval(tick,1000);tick();loadFromServer();
 </script>
 </body>
 </html>"""
@@ -295,6 +335,21 @@ def forecast():
 @app.route("/health")
 def health():
     return jsonify({"ok": True, "vessels": len(vessels), "has_key": bool(API_KEY)})
+
+
+@app.route("/ships", methods=["GET"])
+def get_ships():
+    return jsonify({"main": main_ships, "archive": archive_ships})
+
+@app.route("/ships", methods=["POST"])
+def save_ships():
+    global main_ships, archive_ships
+    data = request.get_json(force=True)
+    with lock:
+        main_ships = data.get("main", [])
+        archive_ships = data.get("archive", [])
+        save_storage()
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
     if API_KEY:
