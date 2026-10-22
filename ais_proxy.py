@@ -70,12 +70,14 @@ async def ais_listener():
         "BoundingBoxes": [[[31.0, 34.0], [33.0, 35.5]]],
         "FilterMessageTypes": ["PositionReport", "ShipStaticData", "StandardClassBPositionReport"]
     }
+    retry_delay = 30  # start with 30 seconds
     while True:
         try:
             print("Connecting to AISStream...", flush=True)
             async with websockets.connect(uri) as ws:
                 await ws.send(json.dumps(sub))
                 print("Connected and subscribed to area around Ashdod", flush=True)
+                retry_delay = 30  # reset on success
                 async for raw in ws:
                     try:
                         msg = json.loads(raw)
@@ -127,8 +129,10 @@ async def ais_listener():
                     except Exception as e:
                         print("Parse error:", e, flush=True)
         except Exception as e:
-            print("AISStream connection error:", e, flush=True)
-            await asyncio.sleep(10)
+            print(f"AISStream connection error: {e}", flush=True)
+            print(f"Retrying in {retry_delay} seconds...", flush=True)
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 300)  # max 5 minutes
 
 def run_ais():
     asyncio.run(ais_listener())
