@@ -655,7 +655,7 @@ function renderManage(){
       <th>ETA</th>
       <th>רציף</th>
       <th>כיוון<br><select id="f-dir" onchange="renderManage()"><option value="">הכל</option><option value="in">כניסה</option><option value="out">יציאה</option></select></th>
-      <th>צוות / ��וסעים / טיפול</th>
+      <th>צוות / נוסעים / טיפול</th>
       <th>סטטוס<br><select id="f-status" onchange="renderManage()"><option value="">הכל</option>${[...STATUS_IN,...STATUS_OUT].map(x=>`<option>${x}</option>`).join('')}</select></th>
       <th>הערות</th>
       <th></th>
