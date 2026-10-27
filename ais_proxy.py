@@ -273,6 +273,10 @@ th input,th select{margin-top:.3rem;padding:.3rem .45rem;font-size:.8rem;}
 
 /* ---------- Archive ---------- */
 .toolbar .tcount{font-family:var(--mono);font-size:.95rem;color:var(--mid);background:var(--raised);border:1px solid var(--line-strong);border-radius:2rem;padding:.15rem .75rem;}
+dialog#arch-edit{background:var(--panel-solid,#0c1528);color:var(--text);border:1px solid var(--line-strong);border-radius:1rem;padding:1.5rem;width:min(56rem,92vw);max-height:90vh;overflow:auto;margin:auto;}
+dialog#arch-edit::backdrop{background:rgba(2,6,16,.75);backdrop-filter:blur(4px);}
+dialog#arch-edit h3{font-size:1.3rem;font-weight:800;margin-bottom:1rem;}
+.dlg-actions{display:flex;gap:.6rem;margin-top:1rem;}
 .arch-table td{vertical-align:middle;font-size:.95rem;}
 .arch-table .a-name{font-weight:800;font-size:1.05rem;}
 .arch-table .mono{font-family:var(--mono);}
@@ -402,6 +406,33 @@ th input,th select{margin-top:.3rem;padding:.3rem .45rem;font-size:.8rem;}
     </nav>
   </footer>
 </div>
+
+<dialog id="arch-edit" aria-labelledby="arch-edit-title">
+  <form method="dialog" onsubmit="event.preventDefault();saveArchEdit()">
+    <h3 id="arch-edit-title">עריכת רשומה בארכיון</h3>
+    <div class="grid">
+      <div><label for="ae-name">שם אוניה *</label><input id="ae-name" required></div>
+      <div><label for="ae-agent">סוכן</label><input id="ae-agent"></div>
+      <div><label for="ae-source">מקור</label><select id="ae-source"></select></div>
+      <div><label for="ae-dir">כיוון</label><select id="ae-dir"><option value="in">כניסה</option><option value="out">יציאה</option></select></div>
+      <div><label for="ae-eta">זמן משוער</label><input type="datetime-local" id="ae-eta"></div>
+      <div><label for="ae-berth">רציף</label><input id="ae-berth"></div>
+      <div><label for="ae-flag">דגל</label><input id="ae-flag"></div>
+      <div><label for="ae-imo">IMO</label><input id="ae-imo"></div>
+      <div><label for="ae-crew">צוות</label><input type="number" min="0" id="ae-crew"></div>
+      <div><label for="ae-pax">נוסעים</label><input type="number" min="0" id="ae-pax"></div>
+      <div><label for="ae-treat">טיפול</label><input type="number" min="0" id="ae-treat"></div>
+      <div><label for="ae-status">סטטוס</label><select id="ae-status"></select></div>
+      <div><label for="ae-archivedAt">הועבר לארכיון</label><input type="datetime-local" id="ae-archivedAt"></div>
+    </div>
+    <label for="ae-notes">הערות</label>
+    <textarea id="ae-notes" class="notes-input" style="min-width:0;width:100%;"></textarea>
+    <div class="dlg-actions">
+      <button type="submit" class="btn">שמור</button>
+      <button type="button" class="btn ghost" onclick="closeArchEdit()">ביטול</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 const REFRESH_MS = 10000;
@@ -721,7 +752,7 @@ function renderManage(){
         <td><select onchange="changeStatus(${s.id},this.value)">${statusOpts(s)}</select></td>
         <td><textarea class="notes-input" aria-label="הערות" onchange="upd(${s.id},'notes',this.value)">${esc(s.notes||'')}</textarea></td>
         <td class="row-actions">
-          <button class="btn small" onclick="createExit(${s.id})">צור יציאה</button>
+          ${s.direction==='out' ? '' : `<button class="btn small" onclick="createExit(${s.id})">צור יציאה</button>`}
           <button class="btn danger small" onclick="removeShip(${s.id})">הסר</button>
         </td>
       </tr>`).join('')}
@@ -809,6 +840,7 @@ function renderArchive(){
       ${sortTh('archive','status','סטטוס')}
       ${sortTh('archive','archivedAt','הועבר לארכיון')}
       ${sortTh('archive','notes','הערות')}
+      <th></th>
     </tr></thead>
     <tbody>
     ${list.length ? list.map(s=>`
@@ -823,7 +855,8 @@ function renderArchive(){
         <td><span class="badge">${esc(s.status||'—')}</span></td>
         <td class="mono dim">${s.archivedAt?esc(new Date(s.archivedAt).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})):'—'}</td>
         <td><textarea class="notes-input" aria-label="הערות" onchange="editArch(${s.id},this.value)">${esc(s.notes||'')}</textarea></td>
-      </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;color:var(--mid);padding:2rem;">אין תוצאות</td></tr>'}
+        <td class="row-actions"><button class="btn small" onclick="openArchEdit(${s.id})">ערוך</button></td>
+      </tr>`).join('') : '<tr><td colspan="13" style="text-align:center;color:var(--mid);padding:2rem;">אין תוצאות</td></tr>'}
     </tbody>
   </table></div>`;
   [['name','fa-name'],['agent','fa-agent'],['source','fa-source'],['dir','fa-dir']].forEach(([k,id])=>{
@@ -831,6 +864,42 @@ function renderArchive(){
   });
 }
 function editArch(id,notes){const s=archive.find(x=>x.id===id);if(s){s.notes=notes;save();}}
+
+const toLocalInput = iso => {
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+let editingArchId = null;
+function openArchEdit(id){
+  const s = archive.find(x=>x.id===id); if(!s) return;
+  editingArchId = id;
+  const set = (k,v) => document.getElementById('ae-'+k).value = v ?? '';
+  document.getElementById('ae-source').innerHTML = SOURCES.map(x=>`<option>${esc(x)}</option>`).join('');
+  document.getElementById('ae-status').innerHTML = [...STATUS_IN,...STATUS_OUT].map(x=>`<option>${x}</option>`).join('');
+  set('name',s.name); set('agent',s.agent); set('source',s.source); set('eta',s.eta);
+  set('berth',s.berth); set('dir',s.direction==='out'?'out':'in'); set('flag',s.flag); set('imo',s.imo);
+  set('crew',s.crew); set('pax',s.pax); set('treat',s.treat); set('status',s.status);
+  set('archivedAt',toLocalInput(s.archivedAt)); set('notes',s.notes);
+  document.getElementById('arch-edit').showModal();
+}
+function closeArchEdit(){ document.getElementById('arch-edit').close(); editingArchId = null; }
+function saveArchEdit(){
+  const s = archive.find(x=>x.id===editingArchId); if(!s) return closeArchEdit();
+  const v = k => document.getElementById('ae-'+k).value;
+  const name = v('name').trim();
+  if(!name){ alert('יש להזין שם'); return; }
+  Object.assign(s,{
+    name, agent:v('agent').trim(), source:v('source'), eta:v('eta'), berth:v('berth').trim(),
+    direction:v('dir'), flag:v('flag').trim(), imo:v('imo').trim(),
+    crew:num(v('crew')), pax:num(v('pax')), treat:num(v('treat')),
+    status:v('status'), notes:v('notes')
+  });
+  const at = v('archivedAt');
+  if(at) s.archivedAt = new Date(at).toISOString();
+  save(); closeArchEdit(); renderAll();
+}
 
 /* ---------- Navigation ---------- */
 function renderAll(){
@@ -884,6 +953,7 @@ setInterval(tick,1000); tick();
 /* ---------- Refresh loop ---------- */
 function userIsEditing(){
   if(document.getElementById('manual-form').style.display==='block') return true;
+  if(document.getElementById('arch-edit').open) return true;
   const a = document.activeElement;
   return !!a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest('#view-manage,#view-archive');
 }
