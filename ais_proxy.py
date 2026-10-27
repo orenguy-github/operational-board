@@ -251,8 +251,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--cyan);outline-of
 textarea{min-height:3rem;resize:vertical;}
 ::placeholder{color:var(--low);}
 
-.table-card{background:var(--panel);border:1px solid var(--line);border-radius:1rem;overflow:hidden;}
+.table-card{background:var(--panel);border:1px solid var(--line);border-radius:1rem;overflow-x:auto;}
 table{width:100%;border-collapse:collapse;}
+.th-sort{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem;font:700 .85rem var(--sans);color:var(--mid);white-space:nowrap;padding:.1rem .2rem;border-radius:.4rem;}
+.th-sort:hover{color:var(--text);}
+.th-sort:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.th-sort .arr{font-size:.7rem;opacity:.4;}
+.th-sort.on{color:var(--cyan);}
+.th-sort.on .arr{opacity:1;}
+.notes-input{min-height:5.5rem;min-width:18rem;font-size:1rem;}
 th,td{padding:.7rem .6rem;text-align:right;border-bottom:1px solid var(--line);vertical-align:top;}
 tbody tr:hover{background:rgba(255,255,255,.025);}
 tbody tr:last-child td{border-bottom:none;}
@@ -260,20 +267,22 @@ th{background:#0c1528;font-size:.8rem;color:var(--mid);font-weight:700;white-spa
 th input,th select{margin-top:.3rem;padding:.3rem .45rem;font-size:.8rem;}
 .name-input{font-weight:800;font-size:1.05rem;}
 .cell-sub{font-size:.8rem;color:var(--low);margin-top:.25rem;}
-.nums{display:flex;gap:.3rem;}
-.nums input{width:4.4rem;text-align:center;font-family:var(--mono);}
+.num-input{width:4.6rem;text-align:center;font-family:var(--mono);}
 .row-actions{display:flex;gap:.4rem;flex-direction:column;min-width:6rem;}
 .empty-box{text-align:center;color:var(--mid);padding:3rem;background:var(--panel);border:1px dashed var(--line-strong);border-radius:1rem;font-size:1.1rem;}
 
 /* ---------- Archive ---------- */
-.arch-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;}
-.arch-cols h3{font-size:1.2rem;font-weight:800;margin-bottom:.7rem;display:flex;align-items:center;gap:.6rem;}
-.arch-cols h3 span{font-family:var(--mono);font-size:.95rem;color:var(--low);}
-.archive-box{background:var(--panel);border:1px solid var(--line);border-radius:.9rem;padding:.9rem 1rem;margin-bottom:.6rem;}
-.archive-box strong{font-size:1.1rem;}
-.archive-box .meta{font-size:.9rem;color:var(--mid);margin-top:.25rem;}
-.archive-box .meta2{font-size:.8rem;color:var(--low);margin-top:.25rem;}
-.archive-box textarea{margin-top:.5rem;}
+.toolbar .tcount{font-family:var(--mono);font-size:.95rem;color:var(--mid);background:var(--raised);border:1px solid var(--line-strong);border-radius:2rem;padding:.15rem .75rem;}
+.arch-table td{vertical-align:middle;font-size:.95rem;}
+.arch-table .a-name{font-weight:800;font-size:1.05rem;}
+.arch-table .mono{font-family:var(--mono);}
+.arch-table .dim{color:var(--low);}
+.arch-table .num{text-align:center;font-family:var(--mono);font-weight:700;}
+.arch-table .num.zero{color:var(--low);font-weight:500;}
+.badge{display:inline-block;padding:.15rem .6rem;border-radius:2rem;font-size:.85rem;font-weight:700;background:var(--raised);border:1px solid var(--line-strong);white-space:nowrap;}
+.badge.in{color:var(--cyan);border-color:rgba(45,212,238,.4);}
+.badge.out{color:var(--amber, #fbbf24);border-color:rgba(251,191,36,.4);}
+.arch-table textarea{min-height:3.2rem;min-width:14rem;}
 
 @media (max-width:1100px){
   html{font-size:14px;}
@@ -354,7 +363,7 @@ th input,th select{margin-top:.3rem;padding:.3rem .45rem;font-size:.8rem;}
         <div><label for="m-source">מקור הגעה</label>
           <select id="m-source"><option>חו"ל</option><option>חיפה</option><option>חדרה</option><option>אשקלון</option></select>
         </div>
-        <div><label for="m-eta">ETA</label><input type="datetime-local" id="m-eta"></div>
+        <div><label for="m-eta">זמן משוער</label><input type="datetime-local" id="m-eta"></div>
         <div><label for="m-berth">רציף</label><input id="m-berth"></div>
         <div><label for="m-dir">כיוון</label>
           <select id="m-dir"><option value="in">כניסה</option><option value="out">יציאה</option></select>
@@ -374,10 +383,11 @@ th input,th select{margin-top:.3rem;padding:.3rem .45rem;font-size:.8rem;}
 
   <!-- Archive view -->
   <section id="view-archive" class="view view-scroll">
-    <div class="arch-cols">
-      <div><h3>כניסות <span id="arch-in-count"></span></h3><div id="arch-in"></div></div>
-      <div><h3>יציאות <span id="arch-out-count"></span></h3><div id="arch-out"></div></div>
+    <div class="toolbar">
+      <h2>ארכיון</h2>
+      <span class="tcount" id="arch-count">0</span>
     </div>
+    <div id="arch-wrap"></div>
   </section>
 
   <footer class="footer">
@@ -527,7 +537,7 @@ function card(s){
       <span class="pill"><i></i>${esc(s.status)}</span>
     </div>
     <div class="metrics">
-      <div class="m"><span class="k">${s.direction==='out'?'יציאה':'הגעה (ETA)'}</span><span class="v mono">${e.time}</span>${e.sub?`<span class="sub ${e.cls}">${e.sub}</span>`:''}</div>
+      <div class="m"><span class="k">${s.direction==='out'?'יציאה':'זמן משוער'}</span><span class="v mono">${e.time}</span>${e.sub?`<span class="sub ${e.cls}">${e.sub}</span>`:''}</div>
       ${metric('מקור',s.source)}
       ${metric('רציף',s.berth,{mono:true})}
       ${metric('צוות',s.crew,{mono:true,dimZero:true})}
@@ -639,25 +649,61 @@ function statusOpts(s){
 }
 const SOURCES = ['חו"ל','חיפה','חדרה','אשקלון'];
 
+const sortState = {manage:{key:null,dir:1}, archive:{key:'archivedAt',dir:-1}};
+const TIME_KEYS = ['eta','archivedAt'], NUM_KEYS = ['crew','pax','treat'];
+function sortVal(s,key){
+  if(TIME_KEYS.includes(key)){ const t = s[key] ? new Date(s[key]).getTime() : NaN; return isNaN(t) ? null : t; }
+  if(NUM_KEYS.includes(key)) return (s[key]===null||s[key]===undefined||s[key]==='') ? null : +s[key];
+  const v = (s[key]||'').toString().trim().toLowerCase();
+  return v==='' ? null : v;
+}
+function sortList(list,scope){
+  const {key,dir} = sortState[scope];
+  if(!key) return list;
+  return list.slice().sort((a,b)=>{
+    const x = sortVal(a,key), y = sortVal(b,key);
+    if(x===null && y===null) return 0;
+    if(x===null) return 1;
+    if(y===null) return -1;
+    const c = typeof x==='number' ? x-y : x.localeCompare(y,'he',{numeric:true});
+    return c*dir;
+  });
+}
+function sortTh(scope,key,label,extra=''){
+  const st = sortState[scope], on = st.key===key;
+  const arrow = on ? (st.dir===1?'▲':'▼') : '↕';
+  const aria = on ? (st.dir===1?'ascending':'descending') : 'none';
+  return `<th aria-sort="${aria}"><button type="button" class="th-sort ${on?'on':''}" onclick="setSort('${scope}','${key}')">${label}<span class="arr" aria-hidden="true">${arrow}</span></button>${extra}</th>`;
+}
+function setSort(scope,key){
+  const st = sortState[scope];
+  if(st.key!==key){ st.key=key; st.dir=1; }
+  else if(st.dir===1) st.dir=-1;
+  else { st.key = scope==='archive' ? 'archivedAt' : null; st.dir = scope==='archive' ? -1 : 1; }
+  if(scope==='manage') renderManage(); else renderArchive();
+}
+
 function renderManage(){
   const wrap = document.getElementById('table-wrap');
   const empty = document.getElementById('empty');
   if(!ships.length){wrap.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
   const f = getFilters();
-  const list = filtered();
+  const list = sortList(filtered(),'manage');
   wrap.innerHTML = `
   <div class="table-card"><table>
     <thead><tr>
-      <th>שם<br><input id="f-name" placeholder="סינון" oninput="renderManage();refocus('f-name')"></th>
-      <th>סוכן<br><input id="f-agent" placeholder="סינון" oninput="renderManage();refocus('f-agent')"></th>
-      <th>מקור<br><select id="f-source" onchange="renderManage()"><option value="">הכל</option>${SOURCES.map(x=>`<option>${esc(x)}</option>`).join('')}</select></th>
-      <th>ETA</th>
-      <th>רציף</th>
-      <th>כיוון<br><select id="f-dir" onchange="renderManage()"><option value="">הכל</option><option value="in">כניסה</option><option value="out">יציאה</option></select></th>
-      <th>צוות / נוסעים / טיפול</th>
-      <th>סטטוס<br><select id="f-status" onchange="renderManage()"><option value="">הכל</option>${[...STATUS_IN,...STATUS_OUT].map(x=>`<option>${x}</option>`).join('')}</select></th>
-      <th>הערות</th>
+      ${sortTh('manage','name','שם',`<br><input id="f-name" placeholder="סינון" oninput="renderManage();refocus('f-name')">`)}
+      ${sortTh('manage','agent','סוכן',`<br><input id="f-agent" placeholder="סינון" oninput="renderManage();refocus('f-agent')">`)}
+      ${sortTh('manage','source','מקור',`<br><select id="f-source" onchange="renderManage()"><option value="">הכל</option>${SOURCES.map(x=>`<option>${esc(x)}</option>`).join('')}</select>`)}
+      ${sortTh('manage','eta','זמן משוער')}
+      ${sortTh('manage','berth','רציף')}
+      ${sortTh('manage','direction','כיוון',`<br><select id="f-dir" onchange="renderManage()"><option value="">הכל</option><option value="in">כניסה</option><option value="out">יציאה</option></select>`)}
+      ${sortTh('manage','crew','צוות')}
+      ${sortTh('manage','pax','נוסעים')}
+      ${sortTh('manage','treat','טיפול')}
+      ${sortTh('manage','status','סטטוס',`<br><select id="f-status" onchange="renderManage()"><option value="">הכל</option>${[...STATUS_IN,...STATUS_OUT].map(x=>`<option>${x}</option>`).join('')}</select>`)}
+      ${sortTh('manage','notes','הערות')}
       <th></th>
     </tr></thead>
     <tbody>
@@ -669,13 +715,11 @@ function renderManage(){
         <td><input type="datetime-local" value="${esc(s.eta||'')}" onchange="upd(${s.id},'eta',this.value)"></td>
         <td><input value="${esc(s.berth||'')}" onchange="upd(${s.id},'berth',this.value)" style="width:4.5rem;"></td>
         <td><select onchange="changeDir(${s.id},this.value)"><option value="in" ${s.direction!=='out'?'selected':''}>כניסה</option><option value="out" ${s.direction==='out'?'selected':''}>יציאה</option></select></td>
-        <td><div class="nums">
-          <input type="number" min="0" placeholder="צוות" aria-label="צוות" value="${s.crew??''}" onchange="upd(${s.id},'crew',this.value)">
-          <input type="number" min="0" placeholder="נוסעים" aria-label="נוסעים" value="${s.pax??''}" onchange="upd(${s.id},'pax',this.value)">
-          <input type="number" min="0" placeholder="טיפול" aria-label="דורשי טיפול" value="${s.treat??''}" onchange="upd(${s.id},'treat',this.value)">
-        </div></td>
+        <td><input class="num-input" type="number" min="0" aria-label="צוות" value="${s.crew??''}" onchange="upd(${s.id},'crew',this.value)"></td>
+        <td><input class="num-input" type="number" min="0" aria-label="נוסעים" value="${s.pax??''}" onchange="upd(${s.id},'pax',this.value)"></td>
+        <td><input class="num-input" type="number" min="0" aria-label="דורשי טיפול" value="${s.treat??''}" onchange="upd(${s.id},'treat',this.value)"></td>
         <td><select onchange="changeStatus(${s.id},this.value)">${statusOpts(s)}</select></td>
-        <td><textarea onchange="upd(${s.id},'notes',this.value)">${esc(s.notes||'')}</textarea></td>
+        <td><textarea class="notes-input" aria-label="הערות" onchange="upd(${s.id},'notes',this.value)">${esc(s.notes||'')}</textarea></td>
         <td class="row-actions">
           <button class="btn small" onclick="createExit(${s.id})">צור יציאה</button>
           <button class="btn danger small" onclick="removeShip(${s.id})">הסר</button>
@@ -728,20 +772,63 @@ function fmtEta(iso){
   const d = new Date(iso);
   return isNaN(d) ? iso : d.toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 }
+function getArchFilters(){
+  const v = id => (document.getElementById(id)||{}).value||'';
+  return {name:v('fa-name'),agent:v('fa-agent'),source:v('fa-source'),dir:v('fa-dir')};
+}
 function renderArchive(){
-  const list = arr => arr.length ? arr.slice().reverse().map(s=>`
-    <div class="archive-box">
-      <strong>${esc(s.name)}</strong>
-      <div class="meta">סוכן ${esc(s.agent||'—')} · ${esc(s.source||'')} · ${esc(fmtEta(s.eta))} · רציף ${esc(s.berth||'—')}</div>
-      <div class="meta2">צוות ${s.crew??'—'} · נוסעים ${s.pax??'—'} · טיפול ${s.treat??'—'} · ${new Date(s.archivedAt).toLocaleString('he-IL')}</div>
-      <textarea aria-label="הערות" onchange="editArch(${s.id},this.value)">${esc(s.notes||'')}</textarea>
-    </div>`).join('') : '<div class="empty-box" style="padding:1.2rem;">אין רשומות</div>';
-  const ins = archive.filter(s=>s.direction!=='out');
-  const outs = archive.filter(s=>s.direction==='out');
-  document.getElementById('arch-in').innerHTML = list(ins);
-  document.getElementById('arch-out').innerHTML = list(outs);
-  document.getElementById('arch-in-count').textContent = ins.length;
-  document.getElementById('arch-out-count').textContent = outs.length;
+  const wrap = document.getElementById('arch-wrap');
+  const counter = document.getElementById('arch-count');
+  if(!archive.length){
+    wrap.innerHTML = '<div class="empty-box">הארכיון ריק.</div>';
+    counter.textContent = '0';
+    return;
+  }
+  const f = getArchFilters();
+  const list = sortList(archive.filter(s=>{
+    if(f.name && !(s.name||'').toLowerCase().includes(f.name.toLowerCase())) return false;
+    if(f.agent && !(s.agent||'').toLowerCase().includes(f.agent.toLowerCase())) return false;
+    if(f.source && s.source!==f.source) return false;
+    if(f.dir && (s.direction==='out'?'out':'in')!==f.dir) return false;
+    return true;
+  }),'archive');
+  counter.textContent = list.length===archive.length ? archive.length : `${list.length} / ${archive.length}`;
+  const numCell = v => `<td class="num ${(!v)?'zero':''}">${(v===null||v===undefined||v==='')?'—':esc(v)}</td>`;
+  wrap.innerHTML = `
+  <div class="table-card"><table class="arch-table">
+    <thead><tr>
+      ${sortTh('archive','name','שם',`<br><input id="fa-name" placeholder="סינון" oninput="renderArchive();refocus('fa-name')">`)}
+      ${sortTh('archive','agent','סוכן',`<br><input id="fa-agent" placeholder="סינון" oninput="renderArchive();refocus('fa-agent')">`)}
+      ${sortTh('archive','source','מקור',`<br><select id="fa-source" onchange="renderArchive()"><option value="">הכל</option>${SOURCES.map(x=>`<option>${esc(x)}</option>`).join('')}</select>`)}
+      ${sortTh('archive','direction','כיוון',`<br><select id="fa-dir" onchange="renderArchive()"><option value="">הכל</option><option value="in">כניסה</option><option value="out">יציאה</option></select>`)}
+      ${sortTh('archive','eta','זמן משוער')}
+      ${sortTh('archive','berth','רציף')}
+      ${sortTh('archive','crew','צוות')}
+      ${sortTh('archive','pax','נוסעים')}
+      ${sortTh('archive','treat','טיפול')}
+      ${sortTh('archive','status','סטטוס')}
+      ${sortTh('archive','archivedAt','הועבר לארכיון')}
+      ${sortTh('archive','notes','הערות')}
+    </tr></thead>
+    <tbody>
+    ${list.length ? list.map(s=>`
+      <tr>
+        <td><div class="a-name">${esc(s.name)}</div><div class="cell-sub">${esc(s.flag||'')} ${s.imo?'· '+esc(s.imo):''}</div></td>
+        <td>${esc(s.agent||'—')}</td>
+        <td>${esc(s.source||'—')}</td>
+        <td><span class="badge ${s.direction==='out'?'out':'in'}">${s.direction==='out'?'יציאה':'כניסה'}</span></td>
+        <td class="mono">${esc(fmtEta(s.eta))}</td>
+        <td class="mono">${esc(s.berth||'—')}</td>
+        ${numCell(s.crew)}${numCell(s.pax)}${numCell(s.treat)}
+        <td><span class="badge">${esc(s.status||'—')}</span></td>
+        <td class="mono dim">${s.archivedAt?esc(new Date(s.archivedAt).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})):'—'}</td>
+        <td><textarea class="notes-input" aria-label="הערות" onchange="editArch(${s.id},this.value)">${esc(s.notes||'')}</textarea></td>
+      </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;color:var(--mid);padding:2rem;">אין תוצאות</td></tr>'}
+    </tbody>
+  </table></div>`;
+  [['name','fa-name'],['agent','fa-agent'],['source','fa-source'],['dir','fa-dir']].forEach(([k,id])=>{
+    const el = document.getElementById(id); if(el) el.value = f[k];
+  });
 }
 function editArch(id,notes){const s=archive.find(x=>x.id===id);if(s){s.notes=notes;save();}}
 
