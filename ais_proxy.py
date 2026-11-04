@@ -263,6 +263,17 @@ body.idle.view-display{cursor:none;}
 .card.s-ok{--c:var(--green);}
 .card.s-active{--c:var(--violet);}
 .card.has-treat{border-color:color-mix(in srgb,var(--red) var(--edge-treat,60%),transparent);}
+.card.long-wait{border-color:color-mix(in srgb,var(--red) var(--edge-treat,75%),transparent);}
+.pills{flex:none;display:flex;align-items:center;gap:.6rem;}
+.pill.alert{--c:var(--red);}
+.pill.alert i{animation:blink 1.6s ease-in-out infinite;}
+.wait-badge{
+  display:inline-flex;align-items:center;gap:.4rem;margin-top:.35rem;padding:.15rem .6rem;border-radius:99px;
+  font-size:.85rem;font-weight:700;white-space:nowrap;color:var(--red);
+  background:color-mix(in srgb,var(--red) 14%,transparent);border:1px solid color-mix(in srgb,var(--red) 50%,transparent);
+}
+.wait-badge i{width:.5rem;height:.5rem;border-radius:50%;background:var(--red);}
+tr.row-long-wait > td:first-child{box-shadow:inset -.3rem 0 0 var(--red);}
 
 .card-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;}
 .ship-name{font-size:1.8rem;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -663,6 +674,36 @@ function etaInfo(iso){
   return {time:dateStr+time, sub:'באיחור '+rel, cls:'late'};
 }
 
+/* ---------- Long-wait alert ---------- */
+const WAIT_ALERT_DAYS = 15;
+const WAIT_ALERT_LABEL = `ממתין מעל ${WAIT_ALERT_DAYS} יום`;
+
+function sameShip(a,b){
+  if(a.imo && b.imo) return String(a.imo).trim()===String(b.imo).trim();
+  return (a.name||'').trim().toLowerCase()===(b.name||'').trim().toLowerCase();
+}
+/* The docking estimate the wait is measured from. An exit uses the estimate of the entry it came from. */
+function waitRefTime(s){
+  if(s.direction!=='out') return s.eta;
+  if(s.entryEta) return s.entryEta;
+  if(s.eta) return s.eta;
+  const past = archive
+    .filter(a=>a.direction!=='out' && a.eta && sameShip(a,s))
+    .sort((x,y)=>new Date(y.archivedAt||0)-new Date(x.archivedAt||0));
+  return past.length ? past[0].eta : '';
+}
+function waitDays(s){
+  const ref = waitRefTime(s);
+  if(!ref) return null;
+  const t = new Date(ref).getTime();
+  if(isNaN(t)) return null;
+  return Math.floor((Date.now()-t)/86400000);
+}
+function isLongWait(s){
+  const d = waitDays(s);
+  return d!==null && d>=WAIT_ALERT_DAYS;
+}
+
 function metric(k,v,opts={}){
   const zero = (v===null||v===undefined||v===''||v===0);
   const shown = (v===null||v===undefined||v==='') ? '—' : v;
@@ -673,8 +714,9 @@ function card(s){
   const e = etaInfo(s.eta);
   const cls = STATUS_CLASS[s.status] || 's-wait';
   const treat = +s.treat||0;
+  const long = isLongWait(s);
   return `
-  <article class="card ${cls} ${treat>0?'has-treat':''}">
+  <article class="card ${cls} ${treat>0?'has-treat':''} ${long?'long-wait':''}">
     <div class="card-top">
       <div style="min-width:0;">
         <h3 class="ship-name">${esc(s.name)}</h3>
@@ -682,7 +724,10 @@ function card(s){
           ${s.flag?`<b>${esc(s.flag)}</b><span class="sep">·</span>`:''}${s.imo?`IMO ${esc(s.imo)}<span class="sep">·</span>`:''}סוכן: <b>${esc(s.agent||'—')}</b>
         </div>
       </div>
-      <span class="pill"><i></i>${esc(s.status)}</span>
+      <div class="pills">
+        ${long?`<span class="pill alert"><i></i>${WAIT_ALERT_LABEL}</span>`:''}
+        <span class="pill"><i></i>${esc(s.status)}</span>
+      </div>
     </div>
     <div class="metrics">
       <div class="m"><span class="k">${s.direction==='out'?'יציאה':'זמן משוער'}</span><span class="v mono">${e.time}</span>${e.sub?`<span class="sub ${e.cls}">${e.sub}</span>`:''}</div>
@@ -856,7 +901,7 @@ function renderManage(){
     </tr></thead>
     <tbody>
     ${list.map(s=>`
-      <tr>
+      <tr class="${isLongWait(s)?'row-long-wait':''}">
         <td><input class="name-input" value="${esc(s.name)}" onchange="upd(${s.id},'name',this.value)"><div class="cell-sub">${esc(s.flag||'')} ${s.imo?'· '+esc(s.imo):''}</div></td>
         <td><input value="${esc(s.agent||'')}" onchange="upd(${s.id},'agent',this.value)"></td>
         <td><select onchange="upd(${s.id},'source',this.value)">${SOURCES.map(x=>`<option ${s.source===x?'selected':''}>${esc(x)}</option>`).join('')}</select></td>
@@ -866,7 +911,7 @@ function renderManage(){
         <td><input class="num-input" type="number" min="0" aria-label="צוות" value="${s.crew??''}" onchange="upd(${s.id},'crew',this.value)"></td>
         <td><input class="num-input" type="number" min="0" aria-label="נוסעים" value="${s.pax??''}" onchange="upd(${s.id},'pax',this.value)"></td>
         <td><input class="num-input" type="number" min="0" aria-label="דורשי טיפול" value="${s.treat??''}" onchange="upd(${s.id},'treat',this.value)"></td>
-        <td><select onchange="changeStatus(${s.id},this.value)">${statusOpts(s)}</select></td>
+        <td><select onchange="changeStatus(${s.id},this.value)">${statusOpts(s)}</select>${isLongWait(s)?`<br><span class="wait-badge"><i></i>${WAIT_ALERT_LABEL}</span>`:''}</td>
         <td><textarea class="notes-input" aria-label="הערות" onchange="upd(${s.id},'notes',this.value)">${esc(s.notes||'')}</textarea></td>
         <td class="row-actions">
           ${s.direction==='out' ? '' : `<button class="btn small" onclick="createExit(${s.id})">צור יציאה</button>`}
@@ -888,6 +933,7 @@ function upd(id,field,val){
 }
 function changeDir(id,dir){
   const s = ships.find(x=>x.id===id); if(!s) return;
+  if(dir==='out' && s.direction!=='out' && s.eta && !s.entryEta) s.entryEta = s.eta;
   s.direction = dir;
   if(dir==='out' && !STATUS_OUT.includes(s.status)) s.status = 'תהליך בדיקת יציאה';
   if(dir==='in' && !STATUS_IN.includes(s.status)) s.status = 'מוכן לביקורת';
@@ -904,7 +950,7 @@ function changeStatus(id,status){
 function createExit(id){
   const s = ships.find(x=>x.id===id); if(!s) return;
   archive.push({...s,archivedAt:new Date().toISOString()});
-  const clone = {...s,id:Date.now(),direction:'out',status:'תהליך בדיקת יציאה',eta:'',notes:''};
+  const clone = {...s,id:Date.now(),direction:'out',status:'תהליך בדיקת יציאה',eta:'',entryEta:s.entryEta||s.eta||'',notes:''};
   ships = ships.filter(x=>x.id!==id);
   ships.push(clone);
   save(); renderAll();
